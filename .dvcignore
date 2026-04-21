@@ -1,3 +1,10 @@
 # Add patterns of files dvc should ignore, which could improve
 # the performance. Learn more at
 # https://dvc.org/doc/user-guide/dvcignore
+
+# Do not track these raw dataset files in DVC.
+dataset/pretrain_hq.jsonl
+dataset/sft_512.jsonl
+dataset/sft_1024.jsonl
+dataset/sft_2048.jsonl
+dataset/sft_mini_512.jsonl
