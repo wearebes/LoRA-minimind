@@ -120,7 +120,7 @@ def evaluate(model, tokenizer, test_data, max_samples=50):
 
 def main():
     # 测试数据
-    test_file = "../dataset/lora_dataset/Finance_R1-Distill_data_0.jsonl"
+    test_file = "../dataset/lora_dataset/splits/test.jsonl"
     test_data = []
     with open(test_file, 'r', encoding='utf-8') as f:
         for i, line in enumerate(f):

@@ -1,0 +1,6 @@
+outs:
+- md5: ca0c50b3d629542e117a00b1a7c03b19.dir
+  size: 213839410
+  nfiles: 16
+  hash: md5
+  path: huggingface_models

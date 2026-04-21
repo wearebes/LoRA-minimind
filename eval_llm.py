@@ -9,6 +9,17 @@ from LoRA.model_LoRA import apply_lora, load_lora
 from LoRA.trainer_utils import setup_seed, get_model_params
 warnings.filterwarnings('ignore')
 
+def build_input_text(tokenizer, weight_name, conversation, prompt):
+    if weight_name != 'pretrain':
+        templates = {"conversation": conversation, "tokenize": False, "add_generation_prompt": True}
+        if weight_name == 'reason':
+            templates["enable_thinking"] = True
+        return tokenizer.apply_chat_template(**templates)
+
+    bos = tokenizer.bos_token if tokenizer.bos_token else ''
+    return bos + prompt
+
+
 def init_model(args):
     tokenizer = AutoTokenizer.from_pretrained(args.load_from)
     if 'model' in args.load_from:

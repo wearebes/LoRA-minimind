@@ -10,7 +10,7 @@ import torch.distributed as dist
 from contextlib import nullcontext
 from torch import optim
 from torch.nn.parallel import DistributedDataParallel
-from torch.utils.data import ConcatDataset, DataLoader, DistributedSampler, Subset, random_split
+from torch.utils.data import ConcatDataset, DataLoader, DistributedSampler, Subset
 
 __package__ = "trainer"
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
@@ -61,23 +61,12 @@ def build_dataset_from_path(jsonl_path, tokenizer, max_length):
     return LoRADataset(str(path), tokenizer, max_length=max_length)
 
 
-def build_train_eval_datasets(data_path, tokenizer, max_length, eval_data_path=None, eval_fraction=0.1, eval_max_samples=None, seed=42):
+def build_train_eval_datasets(data_path, tokenizer, max_length, eval_data_path=None, eval_max_samples=None):
     train_source = build_dataset_from_path(data_path, tokenizer, max_length)
     if eval_data_path:
         eval_ds = build_dataset_from_path(eval_data_path, tokenizer, max_length)
         return train_source, maybe_limit_dataset(eval_ds, eval_max_samples)
-
-    if len(train_source) <= 1:
-        return train_source, None
-
-    eval_size = max(1, int(round(len(train_source) * eval_fraction)))
-    train_size = len(train_source) - eval_size
-    if train_size <= 0:
-        return train_source, None
-
-    generator = torch.Generator().manual_seed(seed)
-    train_ds, eval_ds = random_split(train_source, [train_size, eval_size], generator=generator)
-    return train_ds, maybe_limit_dataset(eval_ds, eval_max_samples)
+    return train_source, None
 
 
 def train_epoch(
@@ -238,8 +227,8 @@ if __name__ == '__main__':
     parser.add_argument('--num_hidden_layers', default=16, type=int, help='number of transformer layers')
     parser.add_argument('--max_seq_len', default=340, type=int, help='training sequence length')
     parser.add_argument('--use_moe', default=0, type=int, choices=[0, 1], help='enable MoE or not')
-    parser.add_argument('--data_path', type=str, default='dataset/lora_dataset', help='LoRA training dataset path')
-    parser.add_argument('--eval_data_path', type=str, default=None, help='validation dataset path')
+    parser.add_argument('--data_path', type=str, default='dataset/lora_dataset/splits/train.jsonl', help='LoRA training dataset path')
+    parser.add_argument('--eval_data_path', type=str, default='dataset/lora_dataset/splits/val.jsonl', help='validation dataset path')
     parser.add_argument('--eval_max_samples', type=int, default=256, help='max validation samples')
     parser.add_argument('--from_weight', default='full_sft', type=str, help='base weight name')
     parser.add_argument('--from_resume', default=0, type=int, choices=[0, 1], help='resume from checkpoint or not')
@@ -336,9 +325,7 @@ if __name__ == '__main__':
         tokenizer,
         args.max_seq_len,
         eval_data_path=args.eval_data_path,
-        eval_fraction=0.1,
         eval_max_samples=args.eval_max_samples,
-        seed=42,
     )
     Logger(f'Training dataset: {args.data_path}, {len(train_ds)} samples')
     if eval_ds is not None:

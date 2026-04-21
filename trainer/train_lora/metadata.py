@@ -54,11 +54,7 @@ def build_lora_summary(args) -> dict:
         "best_epoch": None,
         "best_step": None,
         "train_dataset": str(resolve_project_path(args.data_path)),
-        "eval_dataset": (
-            str(resolve_project_path(args.eval_data_path))
-            if args.eval_data_path
-            else f"auto_split:{resolve_project_path(args.data_path)}"
-        ),
+        "eval_dataset": str(resolve_project_path(args.eval_data_path)) if args.eval_data_path else None,
         "use_swanlab": bool(args.use_swanlab),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
