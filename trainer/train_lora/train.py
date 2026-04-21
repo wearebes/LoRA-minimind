@@ -20,8 +20,11 @@ from trainer.train_lora.eval import compute_val_loss_from_dataset
 from trainer.train_lora.metadata import (
     TARGET_MODULES,
     artifact_path,
+    build_experiment_config,
     build_lora_summary,
     load_summary,
+    save_best_metrics,
+    save_experiment_config,
     save_summary,
     update_summary_with_best,
 )
@@ -192,7 +195,15 @@ def train_epoch(
                             step=step,
                         )
                     )
-                    save_summary(args.save_dir, best_state['summary'])
+                    save_summary(args.save_dir, best_state['summary'], metadata_dir=args.metadata_dir)
+                    save_best_metrics(
+                        args.save_dir,
+                        val_loss=best_state['val_loss'],
+                        epoch=best_state['epoch'],
+                        step=best_state['step'],
+                        artifact_path_value=best_state['artifact_path'],
+                        metadata_dir=args.metadata_dir,
+                    )
 
             model.train()
 
@@ -206,6 +217,7 @@ if __name__ == '__main__':
     parser.add_argument('--save_dir', type=str, default='out/lora/finance_top4', help='directory for LoRA outputs')
     parser.add_argument('--lora_name', type=str, default=None, help='LoRA adapter name, for example lora_4')
     parser.add_argument('--base_weight_dir', type=str, default=None, help='directory containing base model weights')
+    parser.add_argument('--metadata_dir', type=str, default=None, help='directory for per-run metadata files')
 
     parser.add_argument('--epochs', type=int, default=8, help='number of training epochs')
     parser.add_argument('--batch_size', type=int, default=32, help='batch size')
@@ -243,6 +255,7 @@ if __name__ == '__main__':
     args.data_path = str(resolve_project_path(args.data_path))
     args.eval_data_path = str(resolve_project_path(args.eval_data_path)) if args.eval_data_path else None
     args.base_weight_dir = str(resolve_project_path(args.base_weight_dir)) if args.base_weight_dir else str(infer_base_weight_dir(args.save_dir))
+    args.metadata_dir = str(resolve_project_path(args.metadata_dir)) if args.metadata_dir else args.save_dir
 
     args.target_modules = tuple(item.strip() for item in args.target_modules.split(',') if item.strip())
     if not args.target_modules:
@@ -265,14 +278,16 @@ if __name__ == '__main__':
     lm_config = MiniMindConfig(hidden_size=args.hidden_size, num_hidden_layers=args.num_hidden_layers, use_moe=bool(args.use_moe))
     ckp_data = lm_checkpoint(lm_config, weight=args.lora_name, save_dir='checkpoints') if args.from_resume == 1 else None
     summary = build_lora_summary(args)
-    existing_summary = load_summary(args.save_dir)
+    existing_summary = load_summary(args.save_dir, metadata_dir=args.metadata_dir)
     if existing_summary and args.from_resume == 1:
         summary['created_at'] = existing_summary.get('created_at', summary['created_at'])
         summary['best_val_loss'] = existing_summary.get('best_val_loss')
         summary['best_epoch'] = existing_summary.get('best_epoch')
         summary['best_step'] = existing_summary.get('best_step')
-    summary_file = save_summary(args.save_dir, summary)
+    summary_file = save_summary(args.save_dir, summary, metadata_dir=args.metadata_dir)
+    experiment_config_file = save_experiment_config(args.save_dir, build_experiment_config(args), metadata_dir=args.metadata_dir)
     Logger(f'Summary saved to: {summary_file}')
+    Logger(f'Experiment config saved to: {experiment_config_file}')
 
     device_type = 'cuda' if 'cuda' in args.device else 'cpu'
     dtype = torch.bfloat16 if args.dtype == 'bfloat16' else torch.float16
@@ -405,7 +420,15 @@ if __name__ == '__main__':
     if is_main_process() and eval_ds is None:
         save_lora(model, str(official_artifact_path))
         summary.update(update_summary_with_best(summary, val_loss=None, epoch=args.epochs, step=None))
-        save_summary(args.save_dir, summary)
+        save_summary(args.save_dir, summary, metadata_dir=args.metadata_dir)
+        save_best_metrics(
+            args.save_dir,
+            val_loss=None,
+            epoch=args.epochs,
+            step=None,
+            artifact_path_value=official_artifact_path,
+            metadata_dir=args.metadata_dir,
+        )
 
     if is_main_process() and args.save_history == 1 and len(loss_history) > 0:
         try:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import re
 import subprocess
 import sys
@@ -9,7 +10,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(PROJECT_ROOT))
-TEST_DATA_PATH = PROJECT_ROOT / "dataset" / "lora_dataset" / "splits" / "test.jsonl"
+TEST_DATA_PATH = Path(os.environ.get("LORA_TEST_DATA_PATH", PROJECT_ROOT / "dataset" / "lora_dataset" / "splits" / "test.jsonl"))
 LORA_ROOT = PROJECT_ROOT / "out" / "lora"
 EVAL_ROOT = LORA_ROOT / "eval_runs"
 OUTPUT_TAG = "finance_test"
@@ -81,6 +82,7 @@ def run_single_evaluation(adapter_path: Path, test_data_path: Path) -> Path:
         str(LORA_RANK),
         "--lora_top_layers",
         str(top_layers),
+        "--write_summary",
     ]
 
     subprocess.run(cmd, cwd=PROJECT_ROOT, check=True)

@@ -243,3 +243,27 @@ python scripts/convert_model.py --mode hf2torch --transformers_path huggingface_
 - 训练输出默认写入 `out/`
 - 断点状态默认写入 `checkpoints/`
 - `docs/dev_logs/` 保留历史记录，不代表当前运行方式
+## WSL One-Command LoRA Sweep
+
+Use the root sweep script to run split check -> 18 LoRA trainings -> batch evaluation in one shot:
+
+```bash
+bash run_experiments.sh
+```
+
+The script activates the `minimind` conda env, uses the fixed split files below, trains 18 adapters into `out/lora/*.pth`, then evaluates them on the test split and writes aggregate results:
+
+- `dataset/lora_dataset/splits/train.jsonl`
+- `dataset/lora_dataset/splits/val.jsonl`
+- `dataset/lora_dataset/splits/test.jsonl`
+- `out/lora/train_runs/<adapter_name>/summary.json`
+- `out/lora/train_runs/<adapter_name>/best_val_metrics.json`
+- `out/lora/eval_runs/<adapter_name>/eval_finance_test_metrics.json`
+- `out/lora/eval_runs/<adapter_name>/eval_finance_test_predictions.jsonl`
+- `out/lora/eval_runs/aggregate_results.csv`
+
+Common overrides can be set with environment variables before running:
+
+```bash
+CONDA_ENV=minimind SAVE_DIR=out/lora EPOCHS=8 BATCH_SIZE=32 LEARNING_RATE=1e-4 bash run_experiments.sh
+```

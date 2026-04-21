@@ -17,20 +17,47 @@ def format_target_modules(modules) -> str:
     return ",".join(str(item).strip() for item in modules if str(item).strip())
 
 
-def summary_path(save_dir: str | Path) -> Path:
-    return Path(resolve_project_path(save_dir)) / "summary.json"
+def metadata_root(save_dir: str | Path, metadata_dir: str | Path | None = None) -> Path:
+    target = metadata_dir if metadata_dir else save_dir
+    return Path(resolve_project_path(target))
 
 
-def experiment_config_path(save_dir: str | Path) -> Path:
-    return Path(resolve_project_path(save_dir)) / "experiment_config.json"
+def summary_path(save_dir: str | Path, metadata_dir: str | Path | None = None) -> Path:
+    return metadata_root(save_dir, metadata_dir) / "summary.json"
 
 
-def best_metrics_path(save_dir: str | Path) -> Path:
-    return Path(resolve_project_path(save_dir)) / "best_val_metrics.json"
+def experiment_config_path(save_dir: str | Path, metadata_dir: str | Path | None = None) -> Path:
+    return metadata_root(save_dir, metadata_dir) / "experiment_config.json"
+
+
+def best_metrics_path(save_dir: str | Path, metadata_dir: str | Path | None = None) -> Path:
+    return metadata_root(save_dir, metadata_dir) / "best_val_metrics.json"
 
 
 def artifact_path(save_dir: str | Path, model_name: str) -> Path:
     return Path(resolve_project_path(save_dir)) / f"{model_name}.pth"
+
+
+def build_experiment_config(args) -> dict:
+    return {
+        "model_name": args.lora_name,
+        "base_weight": args.from_weight,
+        "target_modules": format_target_modules(getattr(args, "target_modules", TARGET_MODULES)),
+        "lora_top_layers": args.lora_top_layers,
+        "lora_rank": args.lora_rank,
+        "lora_alpha": getattr(args, "lora_alpha", None),
+        "lora_dropout": getattr(args, "lora_dropout", 0.0),
+        "epochs": args.epochs,
+        "learning_rate": args.learning_rate,
+        "batch_size": args.batch_size,
+        "max_seq_len": args.max_seq_len,
+        "hidden_size": args.hidden_size,
+        "num_hidden_layers": args.num_hidden_layers,
+        "use_moe": getattr(args, "use_moe", 0),
+        "data_path": str(resolve_project_path(args.data_path)),
+        "eval_data_path": str(resolve_project_path(args.eval_data_path)) if getattr(args, "eval_data_path", None) else None,
+        "artifact_path": str(artifact_path(args.save_dir, args.lora_name)),
+    }
 
 
 def build_lora_summary(args) -> dict:
@@ -68,9 +95,39 @@ def update_summary_with_best(summary: dict, *, val_loss: float | None, epoch: in
     return updated
 
 
-def save_summary(save_dir: str | Path, summary: dict) -> Path:
-    path = summary_path(save_dir)
+def save_summary(save_dir: str | Path, summary: dict, metadata_dir: str | Path | None = None) -> Path:
+    path = summary_path(save_dir, metadata_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+    return path
+
+
+def save_experiment_config(save_dir: str | Path, config: dict, metadata_dir: str | Path | None = None) -> Path:
+    path = experiment_config_path(save_dir, metadata_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
+    return path
+
+
+def save_best_metrics(
+    save_dir: str | Path,
+    *,
+    val_loss: float | None,
+    epoch: int | None,
+    step: int | None,
+    artifact_path_value: str | Path | None = None,
+    metadata_dir: str | Path | None = None,
+) -> Path:
+    payload = {
+        "val_loss": val_loss,
+        "epoch": epoch,
+        "step": step,
+    }
+    if artifact_path_value is not None:
+        payload["best_lora_path"] = str(artifact_path_value)
+    path = best_metrics_path(save_dir, metadata_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     return path
 
 
@@ -80,21 +137,21 @@ def _load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def load_summary(save_dir: str | Path) -> dict:
-    path = summary_path(save_dir)
+def load_summary(save_dir: str | Path, metadata_dir: str | Path | None = None) -> dict:
+    path = summary_path(save_dir, metadata_dir)
     return _load_json(path)
 
 
-def load_training_metadata(save_dir: str | Path) -> dict:
-    summary = load_summary(save_dir)
+def load_training_metadata(save_dir: str | Path, metadata_dir: str | Path | None = None) -> dict:
+    summary = load_summary(save_dir, metadata_dir)
     if summary:
         return summary
 
-    config = _load_json(experiment_config_path(save_dir))
+    config = _load_json(experiment_config_path(save_dir, metadata_dir))
     if not config:
         return {}
 
-    best_metrics = _load_json(best_metrics_path(save_dir))
+    best_metrics = _load_json(best_metrics_path(save_dir, metadata_dir))
     model_name = config.get("model_name", "lora")
     hidden_size = config.get("hidden_size", 768)
     legacy_artifact_path = Path(resolve_project_path(save_dir)) / f"{model_name}_{hidden_size}.pth"
