@@ -88,24 +88,37 @@
 **Base model used in this project**: MiniMind2 (~104M), decoder-only causal LM, `hidden_size=768`, `layers=16`, `heads=8`, `kv_heads=2`, `ffn_dim=2048`, `vocab_size=6400`, `max_position_embeddings=8192`.
 
 
-# lora traning
-We perform a layer-wise LoRA ablation with trainable depth
-\[
-N \in \{2,4,8,16\}
-\]
-where only the top-\(N\) transformer layers are adapted.
+# LoRA Fine-tuning
 
-Base model: full_sft_768
+## Training
 
-Fine-tuning settings:
-- Finance, Top-4
-- Finance, Top-8
-- Finance, Top-16
-- Math+Finance, Top-4
-- Math+Finance, Top-8
-- Math+Finance, Top-16
+```bash
+python trainer/train_lora/train.py
+```
 
-Evaluation metrics:
-- Accuracy
-- F1
-- Exact Match (EM)
+## Evaluation
+
+```bash
+python trainer/train_lora/evaluate.py
+```
+
+## Merge LoRA to Base Model
+
+```bash
+python trainer/train_lora/merge.py
+```
+
+## Batch Experiments
+
+```bash
+bash run_experiments.sh
+```
+
+## Plot Evaluation Results
+
+```bash
+python scripts/plot_eval_metric_lines.py
+```
+
+---
+
